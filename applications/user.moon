@@ -508,3 +508,25 @@ class MoonRocksUser extends lapis.Application
     @flow("followings")\unfollow_object unfollowed_user, "subscription"
 
     redirect_to: @url_for unfollowed_user
+
+  [weekly_digest: "/users/weekly_digest"]: require_login capture_errors_404 =>
+    import Modules from require "models"
+
+    weekly_favorites_followings_query = db.query "select object_id, count(*) from followings
+      where object_type = 1 and created_at >= current_date - interval '7' day
+      group by object_id order by count(*) desc limit 5"
+
+    @weekly_favorites = {}
+
+    for following in *weekly_favorites_followings_query
+      table.insert @weekly_favorites, Modules\find following.object_id
+
+    Users\include_in @weekly_favorites, "user_id"
+
+--    render: true
+
+    UserDigest = require "emails.user_digest"
+    UserDigest\send @, @current_user.email, {
+      current_user: @current_user,
+      weekly_favorites: @weekly_favorites
+    }
